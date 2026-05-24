@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"novel-service/config"
 	"novel-service/database"
+	mcpServer "novel-service/mcp"
 	"novel-service/router"
 )
 
@@ -35,8 +36,12 @@ func main() {
 
 	router.Setup(r)
 
+	// MCP Streamable HTTP endpoint
+	mcpServer.SetupRoutes(r)
+
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	log.Printf("Server starting on %s", addr)
+	log.Printf("MCP endpoint: http://localhost%s/mcp", addr)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
