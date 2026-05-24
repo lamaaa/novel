@@ -159,7 +159,7 @@ async function renderNovelDetail(id) {
     app.innerHTML = `
         <div class="back-link" onclick="navigate('/')">← 返回书架</div>
         <div class="card" style="display:flex;gap:24px;align-items:flex-start;">
-            <div class="cover" style="width:160px;height:210px;flex-shrink:0;font-size:64px;">
+            <div class="novel-detail-cover">
                 ${novel.cover_url ? `<img src="${novel.cover_url}">` : '📖'}
             </div>
             <div style="flex:1">
