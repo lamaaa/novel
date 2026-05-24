@@ -1,0 +1,9 @@
+server:
+  port: "8080"
+
+db:
+  host: "127.0.0.1"
+  port: "3306"
+  user: "root"
+  password: "your_password_here"
+  dbname: "novel_service"

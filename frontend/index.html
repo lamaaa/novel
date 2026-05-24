@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小说服务</title>
+    <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+    <nav id="navbar">
+        <div class="nav-brand" onclick="navigate('/')">📖 小说服务</div>
+        <div class="nav-links">
+            <a onclick="navigate('/')">书架</a>
+            <a onclick="navigate('/novel/create')">写新书</a>
+        </div>
+    </nav>
+
+    <main id="app"></main>
+
+    <div id="modal-overlay" class="modal-overlay hidden" onclick="closeModal()"></div>
+    <div id="modal" class="modal hidden"></div>
+
+    <script src="/assets/app.js"></script>
+</body>
+</html>
