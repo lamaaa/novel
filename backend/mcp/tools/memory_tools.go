@@ -41,6 +41,13 @@ func nullableID(args map[string]interface{}, key string) interface{} {
 	return id
 }
 
+func nullStringValue(v sql.NullString) string {
+	if v.Valid {
+		return v.String
+	}
+	return ""
+}
+
 func likePattern(query string) string {
 	return "%" + strings.TrimSpace(query) + "%"
 }
@@ -197,9 +204,19 @@ func GetRecentChapterSummaries(args map[string]interface{}) *types.CallToolResul
 	list := make([]Summary, 0)
 	for rows.Next() {
 		var s Summary
+		var summary, keyEvents, characters, locations, timelinePosition sql.NullString
+		var plotThreads, foreshadowingChanges, characterChanges sql.NullString
 		rows.Scan(&s.ID, &s.NovelID, &s.ChapterID, &s.ChapterTitle, &s.ChapterOrder,
-			&s.Summary, &s.KeyEvents, &s.Characters, &s.Locations, &s.TimelinePosition,
-			&s.PlotThreads, &s.ForeshadowingChanges, &s.CharacterChanges, &s.CreatedAt, &s.UpdatedAt)
+			&summary, &keyEvents, &characters, &locations, &timelinePosition,
+			&plotThreads, &foreshadowingChanges, &characterChanges, &s.CreatedAt, &s.UpdatedAt)
+		s.Summary = nullStringValue(summary)
+		s.KeyEvents = nullStringValue(keyEvents)
+		s.Characters = nullStringValue(characters)
+		s.Locations = nullStringValue(locations)
+		s.TimelinePosition = nullStringValue(timelinePosition)
+		s.PlotThreads = nullStringValue(plotThreads)
+		s.ForeshadowingChanges = nullStringValue(foreshadowingChanges)
+		s.CharacterChanges = nullStringValue(characterChanges)
 		list = append(list, s)
 	}
 
@@ -279,6 +296,8 @@ func GetCharacterCurrentState(args map[string]interface{}) *types.CallToolResult
 		UpdatedAt           string  `json:"updated_at"`
 	}
 	var lastTitle sql.NullString
+	var currentState, location, goal, relationshipSummary sql.NullString
+	var abilityState, knowledgeState, extra sql.NullString
 
 	err := database.DB.QueryRow(
 		"SELECT cs.id, cs.novel_id, cs.character_id, c.name, c.alias, cs.current_state, cs.location, "+
@@ -286,9 +305,9 @@ func GetCharacterCurrentState(args map[string]interface{}) *types.CallToolResult
 			"ch.title, cs.extra, cs.updated_at "+
 			"FROM character_state cs JOIN `character` c ON cs.character_id=c.id "+
 			"LEFT JOIN chapter ch ON cs.last_seen_chapter_id=ch.id WHERE cs.character_id=?",
-		characterID).Scan(&s.ID, &s.NovelID, &s.CharacterID, &s.Name, &s.Alias, &s.CurrentState,
-		&s.Location, &s.Goal, &s.RelationshipSummary, &s.AbilityState, &s.KnowledgeState,
-		&s.LastSeenChapterID, &lastTitle, &s.Extra, &s.UpdatedAt)
+		characterID).Scan(&s.ID, &s.NovelID, &s.CharacterID, &s.Name, &s.Alias, &currentState,
+		&location, &goal, &relationshipSummary, &abilityState, &knowledgeState,
+		&s.LastSeenChapterID, &lastTitle, &extra, &s.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return errorResult("人物当前状态不存在，请先调用 update_character_state 建立状态")
 	}
@@ -298,6 +317,13 @@ func GetCharacterCurrentState(args map[string]interface{}) *types.CallToolResult
 	if lastTitle.Valid {
 		s.LastSeenChapter = lastTitle.String
 	}
+	s.CurrentState = nullStringValue(currentState)
+	s.Location = nullStringValue(location)
+	s.Goal = nullStringValue(goal)
+	s.RelationshipSummary = nullStringValue(relationshipSummary)
+	s.AbilityState = nullStringValue(abilityState)
+	s.KnowledgeState = nullStringValue(knowledgeState)
+	s.Extra = nullStringValue(extra)
 
 	return successResult(s)
 }
@@ -640,8 +666,13 @@ func GetNovelContext(args map[string]interface{}) *types.CallToolResult {
 	characterStates := make([]CharacterState, 0)
 	for characterRows.Next() {
 		var cs CharacterState
-		characterRows.Scan(&cs.CharacterID, &cs.Name, &cs.Alias, &cs.CurrentState, &cs.Location,
-			&cs.Goal, &cs.AbilityState, &cs.LastSeenChapterID, &cs.UpdatedAt)
+		var currentState, location, goal, abilityState sql.NullString
+		characterRows.Scan(&cs.CharacterID, &cs.Name, &cs.Alias, &currentState, &location,
+			&goal, &abilityState, &cs.LastSeenChapterID, &cs.UpdatedAt)
+		cs.CurrentState = nullStringValue(currentState)
+		cs.Location = nullStringValue(location)
+		cs.Goal = nullStringValue(goal)
+		cs.AbilityState = nullStringValue(abilityState)
 		characterStates = append(characterStates, cs)
 	}
 
