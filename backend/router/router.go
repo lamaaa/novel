@@ -28,6 +28,10 @@ func Setup(r *gin.Engine) {
 		api.GET("/novels/:id/foreshadowings", handlers.GetForeshadowings)
 		api.GET("/foreshadowings/:id", handlers.GetForeshadowing)
 
+		// 长期记忆（只读）
+		api.GET("/novels/:id/memory", handlers.GetNovelMemory)
+		api.GET("/novels/:id/memory/search", handlers.SearchNovelMemory)
+
 		// 版本管理（只读）
 		api.GET("/versions/:entityType/:entityId", handlers.GetVersions)
 		api.GET("/versions/detail/:id", handlers.GetVersion)

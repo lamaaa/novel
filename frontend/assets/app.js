@@ -99,6 +99,7 @@ async function renderNovelDetail(id) {
             <div class="tab" onclick="switchTab('characters')">人物</div>
             <div class="tab" onclick="switchTab('worldviews')">世界观</div>
             <div class="tab" onclick="switchTab('foreshadowings')">伏笔</div>
+            <div class="tab" onclick="switchTab('memory')">长期记忆</div>
         </div>
         <div id="tab-content"></div>
     `;
@@ -119,10 +120,11 @@ async function switchTab(tab) {
     else if (tab === 'characters') await loadCharacters();
     else if (tab === 'worldviews') await loadWorldviews();
     else if (tab === 'foreshadowings') await loadForeshadowings();
+    else if (tab === 'memory') await loadMemory();
 }
 
 function tabName(t) {
-    return { chapters: '目录', characters: '人物', worldviews: '世界观', foreshadowings: '伏笔' }[t] || t;
+    return { chapters: '目录', characters: '人物', worldviews: '世界观', foreshadowings: '伏笔', memory: '长期记忆' }[t] || t;
 }
 
 // --- Chapters ---
@@ -280,6 +282,271 @@ async function loadForeshadowings() {
             </div>
         `).join('')}
     `;
+}
+
+// --- Long-term Memory ---
+async function loadMemory() {
+    const container = document.getElementById('tab-content');
+    container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>正在读取长期记忆...</p></div>';
+    const res = await api('/novels/' + currentNovelId + '/memory?limit=50');
+    if (res.code !== 0) {
+        container.innerHTML = `
+            <div class="memory-warning">
+                <strong>长期记忆暂不可用</strong>
+                <p>${esc(res.message || '请确认记忆表已创建')}</p>
+                <p class="muted">需要先在数据库执行 <code>novel/sql/memory.sql</code>，再让 agent 补录章节记忆。</p>
+            </div>
+        `;
+        return;
+    }
+    renderMemory(res.data || {});
+}
+
+function renderMemory(data) {
+    const summaries = data.summaries || [];
+    const characters = data.characters || [];
+    const memories = data.memories || [];
+    const timeline = data.timeline || [];
+    const counts = data.counts || {};
+    const container = document.getElementById('tab-content');
+    const total = (counts.summaries || 0) + (counts.characters || 0) + (counts.memories || 0) + (counts.timeline || 0);
+
+    container.innerHTML = `
+        <div class="memory-page">
+            <div class="memory-dashboard">
+                ${memoryStat('章节摘要', counts.summaries || 0, '每章剧情梗概与变化')}
+                ${memoryStat('人物状态', counts.characters || 0, '当前位置、目标、能力')}
+                ${memoryStat('剧情记忆', counts.memories || 0, '秘密、线索、关系、规则')}
+                ${memoryStat('时间线', counts.timeline || 0, '故事内事件顺序')}
+            </div>
+            <div class="card memory-toolbar">
+                <div>
+                    <strong>长期记忆库</strong>
+                    <p>用于长篇续写前回顾事实、状态、伏笔和时间线。</p>
+                </div>
+                <div class="memory-search">
+                    <input id="memory-query" type="text" placeholder="检索人物、伏笔、道具、秘密、时间线..." onkeyup="if(event.key==='Enter')searchMemory()">
+                    <button class="btn btn-primary" onclick="searchMemory()">检索</button>
+                    <button class="btn btn-outline" onclick="loadMemory()">重置</button>
+                </div>
+            </div>
+            <div id="memory-search-results"></div>
+            ${total === 0 ? renderMemoryEmptyGuide() : `
+                ${renderChapterSummaries(summaries)}
+                ${renderCharacterStates(characters)}
+                ${renderPlotMemories(memories)}
+                ${renderTimeline(timeline)}
+            `}
+        </div>
+    `;
+}
+
+function memoryStat(label, value, desc) {
+    return `
+        <div class="card memory-stat">
+            <div class="memory-stat-value">${value}</div>
+            <div class="memory-stat-label">${label}</div>
+            <div class="memory-stat-desc">${desc}</div>
+        </div>
+    `;
+}
+
+function renderMemoryEmptyGuide() {
+    return `
+        <div class="card memory-empty-panel">
+            <div class="memory-empty-title">还没有长期记忆</div>
+            <p>可以先让 agent 为已有章节补录记忆。补录后，这里会显示章节摘要、人物当前状态、剧情事实和故事时间线。</p>
+            <div class="memory-todo-grid">
+                <div><strong>1. 章节摘要</strong><span>update_chapter_summary</span></div>
+                <div><strong>2. 人物状态</strong><span>update_character_state</span></div>
+                <div><strong>3. 剧情事实</strong><span>upsert_plot_memory</span></div>
+                <div><strong>4. 时间线</strong><span>upsert_timeline_event</span></div>
+            </div>
+            <div class="memory-prompt-box">
+请为 novel_id=当前小说ID 的第1-5章补录长期记忆。逐章读取正文，生成 chapter_summary，并同步人物当前状态、剧情事实记忆和时间线；不要改正文，完成后汇报补录结果。
+            </div>
+        </div>
+    `;
+}
+
+async function searchMemory() {
+    const query = document.getElementById('memory-query').value.trim();
+    const target = document.getElementById('memory-search-results');
+    if (!query) {
+        target.innerHTML = '';
+        return;
+    }
+    target.innerHTML = '<div class="memory-section"><div class="muted">正在检索...</div></div>';
+    const res = await api('/novels/' + currentNovelId + '/memory/search?query=' + encodeURIComponent(query) + '&limit=30');
+    if (res.code !== 0) {
+        target.innerHTML = `<div class="memory-warning"><strong>检索失败</strong><p>${esc(res.message || '')}</p></div>`;
+        return;
+    }
+    const results = res.data?.results || [];
+    target.innerHTML = `
+        <div class="memory-section">
+            <div class="section-title">检索结果 <span>${results.length}</span></div>
+            ${results.length ? results.map(r => `
+                <div class="memory-item">
+                    <div class="memory-item-head">
+                        <strong>${esc(r.title)}</strong>
+                        <span class="source-pill">${sourceName(r.source)}</span>
+                    </div>
+                    <p>${esc(r.snippet || r.content || '')}</p>
+                    <div class="memory-meta">重要度 ${r.importance || 3} · ${formatDate(r.updated_at)}</div>
+                </div>
+            `).join('') : '<div class="empty-state compact"><p>没有命中长期记忆</p></div>'}
+        </div>
+    `;
+}
+
+function renderChapterSummaries(list) {
+    return `
+        <div class="memory-section">
+            <div class="section-title">章节摘要 <span>${list.length}</span></div>
+            ${list.length ? list.map(s => `
+                <div class="memory-item">
+                    <div class="memory-item-head">
+                        <strong>${s.chapter_order}. ${esc(s.chapter_title)}</strong>
+                        <button class="btn btn-outline btn-sm" onclick="navigate('/chapter/${s.chapter_id}')">查看章节</button>
+                    </div>
+                    <p>${esc(s.summary || '暂无摘要')}</p>
+                    ${jsonChips(s.characters, '人物')}
+                    ${jsonChips(s.locations, '地点')}
+                    ${memoryBlock('关键事件', s.key_events)}
+                    ${memoryBlock('剧情线', s.plot_threads)}
+                    ${memoryBlock('伏笔变化', s.foreshadowing_changes)}
+                    ${memoryBlock('人物变化', s.character_changes)}
+                    <div class="memory-meta">${esc(s.timeline_position || '未记录时间位置')} · ${formatDate(s.updated_at)}</div>
+                </div>
+            `).join('') : emptyMemory('还没有章节摘要。可以让 agent 为前几章补录 update_chapter_summary。')}
+        </div>
+    `;
+}
+
+function renderCharacterStates(list) {
+    return `
+        <div class="memory-section">
+            <div class="section-title">人物当前状态 <span>${list.length}</span></div>
+            ${list.length ? `<div class="memory-grid">${list.map(ch => `
+                <div class="memory-item">
+                    <div class="memory-item-head">
+                        <strong>${esc(ch.name)}${ch.alias ? ` (${esc(ch.alias)})` : ''}</strong>
+                        ${ch.last_seen_chapter_title ? `<span class="source-pill">${esc(ch.last_seen_chapter_title)}</span>` : ''}
+                    </div>
+                    <p>${esc(ch.current_state || '暂无当前状态')}</p>
+                    ${plainLine('位置', ch.location)}
+                    ${plainLine('目标', ch.goal)}
+                    ${plainLine('能力', ch.ability_state)}
+                    ${plainLine('关系', ch.relationship_summary)}
+                    ${plainLine('已知信息', ch.knowledge_state)}
+                    <div class="memory-meta">${formatDate(ch.updated_at)}</div>
+                </div>
+            `).join('')}</div>` : emptyMemory('还没有人物当前状态。可以让 novel-lore 调用 update_character_state。')}
+        </div>
+    `;
+}
+
+function renderPlotMemories(list) {
+    return `
+        <div class="memory-section">
+            <div class="section-title">剧情事实记忆 <span>${list.length}</span></div>
+            ${list.length ? `<div class="memory-grid">${list.map(m => `
+                <div class="memory-item">
+                    <div class="memory-item-head">
+                        <strong>${esc(m.title)}</strong>
+                        <span class="source-pill">${memoryTypeName(m.memory_type)}</span>
+                    </div>
+                    <p>${esc(m.content || '')}</p>
+                    ${jsonChips(m.tags, '标签')}
+                    <div class="memory-meta">
+                        重要度 ${m.importance} · ${memoryStatusName(m.status)}
+                        ${m.chapter_title ? ' · ' + esc(m.chapter_title) : ''}
+                        ${m.character_name ? ' · ' + esc(m.character_name) : ''}
+                    </div>
+                </div>
+            `).join('')}</div>` : emptyMemory('还没有剧情事实记忆。可以让 novel-lore 调用 upsert_plot_memory。')}
+        </div>
+    `;
+}
+
+function renderTimeline(list) {
+    return `
+        <div class="memory-section">
+            <div class="section-title">故事时间线 <span>${list.length}</span></div>
+            ${list.length ? `<div class="timeline-list">${list.map(t => `
+                <div class="timeline-row">
+                    <div class="timeline-marker">${t.sequence_no || '-'}</div>
+                    <div class="memory-item">
+                        <div class="memory-item-head">
+                            <strong>${esc(t.title)}</strong>
+                            ${t.event_time ? `<span class="source-pill">${esc(t.event_time)}</span>` : ''}
+                        </div>
+                        <p>${esc(t.content || '')}</p>
+                        <div class="memory-meta">重要度 ${t.importance}${t.chapter_title ? ' · ' + esc(t.chapter_title) : ''}</div>
+                    </div>
+                </div>
+            `).join('')}</div>` : emptyMemory('还没有时间线事件。可以让 novel-lore 调用 upsert_timeline_event。')}
+        </div>
+    `;
+}
+
+function emptyMemory(text) {
+    return `<div class="empty-state compact"><p>${esc(text)}</p></div>`;
+}
+
+function plainLine(label, value) {
+    if (!value) return '';
+    return `<div class="memory-line"><span>${label}</span>${esc(value)}</div>`;
+}
+
+function memoryBlock(label, raw) {
+    const text = readableJSON(raw);
+    if (!text) return '';
+    return `<div class="memory-block"><strong>${label}</strong><div>${esc(text)}</div></div>`;
+}
+
+function jsonChips(raw, label) {
+    const arr = parseJSONish(raw);
+    if (!arr) return '';
+    const values = Array.isArray(arr) ? arr : Object.entries(arr).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+    if (!values.length) return '';
+    return `<div class="memory-chips"><span>${label}</span>${values.map(v => `<em>${esc(String(v))}</em>`).join('')}</div>`;
+}
+
+function parseJSONish(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    try { return JSON.parse(raw); } catch (_) { return null; }
+}
+
+function readableJSON(raw) {
+    if (!raw) return '';
+    const parsed = parseJSONish(raw);
+    if (!parsed) return String(raw);
+    if (Array.isArray(parsed)) {
+        return parsed.map(item => typeof item === 'object' ? JSON.stringify(item) : String(item)).join('\n');
+    }
+    return Object.entries(parsed).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n');
+}
+
+function sourceName(s) {
+    return { plot_memory: '剧情记忆', chapter_summary: '章节摘要', character_state: '人物状态', timeline: '时间线' }[s] || s;
+}
+
+function memoryTypeName(t) {
+    return { fact: '事实', secret: '秘密', clue: '线索', rule: '规则', relationship: '关系', conflict: '冲突', plan: '计划' }[t] || t || '事实';
+}
+
+function memoryStatusName(s) {
+    return { 0: '有效', 1: '已过期', 2: '存疑' }[s] || '有效';
+}
+
+function formatDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString();
 }
 
 // --- Modal ---
