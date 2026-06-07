@@ -509,9 +509,23 @@ function memoryBlock(label, raw, variant = '') {
 function jsonChips(raw, label) {
     const arr = parseJSONish(raw);
     if (!arr) return '';
-    const values = Array.isArray(arr) ? arr : Object.entries(arr).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`);
+    const values = Array.isArray(arr) ? arr.map(formatChipValue) : Object.entries(arr).map(([k, v]) => `${memoryFieldLabel(k)}: ${formatChipValue(v)}`);
     if (!values.length) return '';
     return `<div class="memory-chips"><span>${label}</span>${values.map(v => `<em>${esc(String(v))}</em>`).join('')}</div>`;
+}
+
+function formatChipValue(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value !== 'object') return String(value);
+    if (value.name) {
+        const role = value.role ? `（${value.role}）` : '';
+        return `${value.name}${role}`;
+    }
+    if (value.title) return String(value.title);
+    return Object.entries(value)
+        .filter(([, v]) => v !== null && v !== undefined && v !== '')
+        .map(([k, v]) => `${memoryFieldLabel(k)}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+        .join('；');
 }
 
 function parseJSONish(raw) {
