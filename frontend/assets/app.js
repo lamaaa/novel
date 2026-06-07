@@ -184,7 +184,7 @@ async function loadCharacters() {
                 <div class="avatar">${ch.avatar_url ? `<img src="${ch.avatar_url}" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : '👤'}</div>
                 <div class="info">
                     <h4>${esc(ch.name)}${ch.alias ? ` (${esc(ch.alias)})` : ''}</h4>
-                    <p>${genderText(ch.gender)}${ch.age ? ' · '+ch.age+'岁' : ''}</p>
+                    <p>${genderText(ch.gender)}${ch.age ? ' · ' + ageText(ch.age) : ''}</p>
                     <p style="margin-top:4px">${esc((ch.description||'').substring(0,60))}${(ch.description||'').length>60?'...':''}</p>
                 </div>
             </div>
@@ -194,6 +194,12 @@ async function loadCharacters() {
 }
 
 function genderText(g) { return {0:'未知',1:'男',2:'女'}[g]||'未知'; }
+function ageText(age) {
+    if (!age) return '';
+    const s = String(age);
+    if (s.includes('岁')) return s;
+    return s + '岁';
+}
 
 async function showCharacterDetail(id) {
     const res = await api('/characters/' + id);
