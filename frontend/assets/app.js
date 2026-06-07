@@ -415,8 +415,8 @@ function renderChapterSummaries(list) {
                     ${jsonChips(s.locations, '地点')}
                     ${memoryBlock('关键事件', s.key_events)}
                     ${memoryBlock('剧情线', s.plot_threads)}
-                    ${memoryBlock('伏笔变化', s.foreshadowing_changes)}
-                    ${memoryBlock('人物变化', s.character_changes)}
+                    ${memoryBlock('伏笔变化', s.foreshadowing_changes, 'foreshadowing')}
+                    ${memoryBlock('人物变化', s.character_changes, 'character')}
                     <div class="memory-meta">${esc(s.timeline_position || '未记录时间位置')} · ${formatDate(s.updated_at)}</div>
                 </div>
             `).join('') : emptyMemory('还没有章节摘要。可以让 agent 为前几章补录 update_chapter_summary。')}
@@ -500,8 +500,8 @@ function plainLine(label, value) {
     return `<div class="memory-line"><span>${label}</span>${esc(value)}</div>`;
 }
 
-function memoryBlock(label, raw) {
-    const content = readableMemoryContent(raw);
+function memoryBlock(label, raw, variant = '') {
+    const content = readableMemoryContent(raw, variant);
     if (!content) return '';
     return `<div class="memory-block"><strong>${label}</strong>${content}</div>`;
 }
@@ -520,22 +520,24 @@ function parseJSONish(raw) {
     try { return JSON.parse(raw); } catch (_) { return null; }
 }
 
-function readableMemoryContent(raw) {
+function readableMemoryContent(raw, variant = '') {
     if (!raw) return '';
     const parsed = parseJSONish(raw);
     if (!parsed) return `<div>${esc(String(raw))}</div>`;
     if (Array.isArray(parsed)) {
         if (!parsed.length) return '';
-        return `<ul>${parsed.map(item => `<li>${formatMemoryItem(item)}</li>`).join('')}</ul>`;
+        return `<ul>${parsed.map(item => `<li>${formatMemoryItem(item, variant)}</li>`).join('')}</ul>`;
     }
     const entries = Object.entries(parsed).filter(([, v]) => v !== null && v !== undefined && v !== '');
     if (!entries.length) return '';
     return `<dl>${entries.map(([k, v]) => `<dt>${esc(memoryFieldLabel(k))}</dt><dd>${formatMemoryValue(v)}</dd>`).join('')}</dl>`;
 }
 
-function formatMemoryItem(item) {
+function formatMemoryItem(item, variant = '') {
     if (item === null || item === undefined) return '';
     if (typeof item !== 'object') return esc(String(item));
+    if (variant === 'foreshadowing') return formatChangeItem(item, ['change', 'detail'], ['status', 'foreshadowing']);
+    if (variant === 'character') return formatChangeItem(item, ['change', 'detail'], ['character', 'name', 'status', 'goal', 'ability', 'relationship', 'knowledge']);
 
     const parts = [];
     const preferred = ['event', 'thread', 'detail', 'change', 'progress', 'status', 'foreshadowing', 'name', 'character', 'location', 'significance'];
@@ -551,10 +553,43 @@ function formatMemoryItem(item) {
     return parts.join('<span class="memory-sep"> · </span>');
 }
 
+function formatChangeItem(item, primaryKeys, secondaryKeys) {
+    const primary = primaryKeys.map(key => item[key]).find(value => value !== undefined && value !== null && value !== '');
+    const secondary = [];
+
+    secondaryKeys.forEach(key => {
+        if (primaryKeys.includes(key) || item[key] === undefined || item[key] === null || item[key] === '') return;
+        secondary.push(formatMemoryBadge(key, item[key]));
+    });
+    Object.entries(item).forEach(([key, value]) => {
+        if (primaryKeys.includes(key) || secondaryKeys.includes(key) || key.endsWith('_id') || value === undefined || value === null || value === '') return;
+        secondary.push(formatMemoryBadge(key, value));
+    });
+
+    return `
+        <div class="memory-entry-title">${esc(String(primary || '未记录变化'))}</div>
+        ${secondary.length ? `<div class="memory-entry-meta">${secondary.join('')}</div>` : ''}
+    `;
+}
+
+function formatMemoryBadge(key, value) {
+    const displayValue = key === 'status' ? memoryChangeStatusName(value) : formatMemoryValue(value);
+    return `<span><b>${esc(memoryFieldLabel(key))}</b>${displayValue}</span>`;
+}
+
 function formatMemoryValue(value) {
     if (Array.isArray(value)) return esc(value.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('、'));
     if (typeof value === 'object') return esc(Object.entries(value).map(([k, v]) => `${memoryFieldLabel(k)}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('；'));
     return esc(String(value));
+}
+
+function memoryChangeStatusName(value) {
+    return {
+        planted: '已埋设',
+        strengthened: '已强化',
+        resolved: '已回收',
+        changed: '已变化'
+    }[value] || esc(String(value));
 }
 
 function memoryFieldLabel(key) {

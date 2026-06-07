@@ -512,6 +512,31 @@ body {
 .memory-sep {
     color: #c0c8cc;
 }
+.memory-entry-title {
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.6;
+}
+.memory-entry-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 5px;
+}
+.memory-entry-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eef3f6;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+.memory-entry-meta b {
+    color: var(--text);
+    font-weight: 600;
+}
 .memory-line {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
