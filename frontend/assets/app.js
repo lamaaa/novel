@@ -239,7 +239,7 @@ async function loadWorldviews() {
                 <div style="display:flex;justify-content:space-between;align-items:center">
                     <strong>${esc(w.title)}</strong>
                 </div>
-                <p style="margin-top:8px;color:var(--text-secondary);white-space:pre-wrap">${esc(w.content)}</p>
+                <div class="markdown-body">${renderMarkdown(w.content || '')}</div>
             </div>`;
         });
         html += '</div>';
@@ -567,6 +567,78 @@ function esc(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+function renderMarkdown(raw) {
+    if (!raw) return '';
+    const lines = String(raw).replace(/\r\n/g, '\n').split('\n');
+    const html = [];
+    let paragraph = [];
+    let list = null;
+
+    const flushParagraph = () => {
+        if (!paragraph.length) return;
+        html.push(`<p>${inlineMarkdown(paragraph.join(' '))}</p>`);
+        paragraph = [];
+    };
+    const closeList = () => {
+        if (!list) return;
+        html.push(`</${list}>`);
+        list = null;
+    };
+    const openList = (type) => {
+        if (list === type) return;
+        closeList();
+        list = type;
+        html.push(`<${type}>`);
+    };
+
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            flushParagraph();
+            closeList();
+            return;
+        }
+
+        const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+        if (heading) {
+            flushParagraph();
+            closeList();
+            const level = Math.min(heading[1].length + 1, 5);
+            html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+            return;
+        }
+
+        const unordered = trimmed.match(/^[-*]\s+(.+)$/);
+        if (unordered) {
+            flushParagraph();
+            openList('ul');
+            html.push(`<li>${inlineMarkdown(unordered[1])}</li>`);
+            return;
+        }
+
+        const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+        if (ordered) {
+            flushParagraph();
+            openList('ol');
+            html.push(`<li>${inlineMarkdown(ordered[1])}</li>`);
+            return;
+        }
+
+        closeList();
+        paragraph.push(trimmed);
+    });
+
+    flushParagraph();
+    closeList();
+    return html.join('');
+}
+
+function inlineMarkdown(text) {
+    return esc(text)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+?)`/g, '<code>$1</code>');
 }
 
 // --- Version History (read-only) ---
