@@ -501,9 +501,9 @@ function plainLine(label, value) {
 }
 
 function memoryBlock(label, raw) {
-    const text = readableJSON(raw);
-    if (!text) return '';
-    return `<div class="memory-block"><strong>${label}</strong><div>${esc(text)}</div></div>`;
+    const content = readableMemoryContent(raw);
+    if (!content) return '';
+    return `<div class="memory-block"><strong>${label}</strong>${content}</div>`;
 }
 
 function jsonChips(raw, label) {
@@ -520,14 +520,60 @@ function parseJSONish(raw) {
     try { return JSON.parse(raw); } catch (_) { return null; }
 }
 
-function readableJSON(raw) {
+function readableMemoryContent(raw) {
     if (!raw) return '';
     const parsed = parseJSONish(raw);
-    if (!parsed) return String(raw);
+    if (!parsed) return `<div>${esc(String(raw))}</div>`;
     if (Array.isArray(parsed)) {
-        return parsed.map(item => typeof item === 'object' ? JSON.stringify(item) : String(item)).join('\n');
+        if (!parsed.length) return '';
+        return `<ul>${parsed.map(item => `<li>${formatMemoryItem(item)}</li>`).join('')}</ul>`;
     }
-    return Object.entries(parsed).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n');
+    const entries = Object.entries(parsed).filter(([, v]) => v !== null && v !== undefined && v !== '');
+    if (!entries.length) return '';
+    return `<dl>${entries.map(([k, v]) => `<dt>${esc(memoryFieldLabel(k))}</dt><dd>${formatMemoryValue(v)}</dd>`).join('')}</dl>`;
+}
+
+function formatMemoryItem(item) {
+    if (item === null || item === undefined) return '';
+    if (typeof item !== 'object') return esc(String(item));
+
+    const parts = [];
+    const preferred = ['event', 'thread', 'detail', 'change', 'progress', 'status', 'foreshadowing', 'name', 'character', 'location', 'significance'];
+    preferred.forEach(key => {
+        if (item[key] !== undefined && item[key] !== null && item[key] !== '') {
+            parts.push(`<span class="memory-field">${esc(memoryFieldLabel(key))}</span>${formatMemoryValue(item[key])}`);
+        }
+    });
+    Object.entries(item).forEach(([key, value]) => {
+        if (preferred.includes(key) || value === undefined || value === null || value === '') return;
+        parts.push(`<span class="memory-field">${esc(memoryFieldLabel(key))}</span>${formatMemoryValue(value)}`);
+    });
+    return parts.join('<span class="memory-sep"> · </span>');
+}
+
+function formatMemoryValue(value) {
+    if (Array.isArray(value)) return esc(value.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join('、'));
+    if (typeof value === 'object') return esc(Object.entries(value).map(([k, v]) => `${memoryFieldLabel(k)}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('；'));
+    return esc(String(value));
+}
+
+function memoryFieldLabel(key) {
+    return {
+        event: '事件',
+        significance: '意义',
+        thread: '线',
+        progress: '进展',
+        detail: '细节',
+        status: '状态',
+        foreshadowing: '伏笔',
+        name: '人物',
+        character: '人物',
+        change: '变化',
+        location: '地点',
+        ability: '能力',
+        relationship: '关系',
+        knowledge: '已知信息'
+    }[key] || key;
 }
 
 function sourceName(s) {

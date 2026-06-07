@@ -476,6 +476,42 @@ body {
     white-space: pre-wrap;
     color: var(--text-secondary);
 }
+.memory-block ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.memory-block li {
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+    color: var(--text-secondary);
+    line-height: 1.65;
+}
+.memory-block li:first-child {
+    border-top: 0;
+}
+.memory-block dl {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 6px 12px;
+    margin: 0;
+}
+.memory-block dt {
+    color: var(--text-secondary);
+}
+.memory-block dd {
+    margin: 0;
+    color: var(--text);
+}
+.memory-field {
+    display: inline-flex;
+    margin-right: 4px;
+    color: var(--text);
+    font-weight: 600;
+}
+.memory-sep {
+    color: #c0c8cc;
+}
 .memory-line {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
