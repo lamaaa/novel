@@ -22,6 +22,6 @@ COPY --from=builder /app/novel-service .
 COPY backend/config.yaml ./config.yaml
 COPY frontend/ ../frontend/
 
-EXPOSE 8000
+EXPOSE 8001
 
 CMD ["./novel-service"]
