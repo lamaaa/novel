@@ -41,6 +41,26 @@ func Load() *Config {
 		log.Fatalf("Failed to parse config file: %v", err)
 	}
 
+	// 环境变量覆盖数据库配置（适配 Docker 部署）
+	if v := os.Getenv("DB_HOST"); v != "" {
+		cfg.DB.Host = v
+	}
+	if v := os.Getenv("DB_PORT"); v != "" {
+		cfg.DB.Port = v
+	}
+	if v := os.Getenv("DB_USER"); v != "" {
+		cfg.DB.User = v
+	}
+	if v := os.Getenv("DB_PASSWORD"); v != "" {
+		cfg.DB.Password = v
+	}
+	if v := os.Getenv("DB_NAME"); v != "" {
+		cfg.DB.DBName = v
+	}
+	if v := os.Getenv("SERVER_PORT"); v != "" {
+		cfg.Server.Port = v
+	}
+
 	return &cfg
 }
 
