@@ -1,5 +1,6 @@
 server:
   port: "8080"
+  mcp_token: "your-mcp-token-here"
 
 db:
   host: "127.0.0.1"

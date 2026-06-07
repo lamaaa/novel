@@ -16,11 +16,43 @@ const (
 	ServerVersion   = "1.0.0"
 )
 
+var mcpToken string
+
 // SetupRoutes registers MCP Streamable HTTP routes on the gin engine
-func SetupRoutes(r *gin.Engine) {
-	r.POST("/mcp", handleMCPPost)
-	r.GET("/mcp", handleMCPGet)
-	r.DELETE("/mcp", handleMCPDelete)
+func SetupRoutes(r *gin.Engine, token string) {
+	mcpToken = token
+	mcpGroup := r.Group("/mcp")
+	if mcpToken != "" {
+		mcpGroup.Use(mcpAuthMiddleware())
+	}
+	mcpGroup.POST("", handleMCPPost)
+	mcpGroup.GET("", handleMCPGet)
+	mcpGroup.DELETE("", handleMCPDelete)
+}
+
+// mcpAuthMiddleware validates Bearer token for MCP endpoints
+func mcpAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		auth := c.GetHeader("Authorization")
+		if auth == "" {
+			c.JSON(http.StatusUnauthorized, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Error:   &RPCError{Code: -32001, Message: "Missing Authorization header"},
+			})
+			c.Abort()
+			return
+		}
+		parts := strings.SplitN(auth, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" || parts[1] != mcpToken {
+			c.JSON(http.StatusUnauthorized, JSONRPCResponse{
+				JSONRPC: "2.0",
+				Error:   &RPCError{Code: -32001, Message: "Invalid token"},
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 // handleMCPPost handles all JSON-RPC requests via POST

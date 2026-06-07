@@ -37,7 +37,7 @@ func main() {
 	router.Setup(r)
 
 	// MCP Streamable HTTP endpoint
-	mcpServer.SetupRoutes(r)
+	mcpServer.SetupRoutes(r, cfg.Server.MCPToken)
 
 	addr := fmt.Sprintf(":%s", cfg.Server.Port)
 	log.Printf("Server starting on %s", addr)

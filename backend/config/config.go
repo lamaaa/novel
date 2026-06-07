@@ -14,7 +14,8 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port string `yaml:"port"`
+	Port     string `yaml:"port"`
+	MCPToken string `yaml:"mcp_token"`
 }
 
 type DBConfig struct {
@@ -59,6 +60,9 @@ func Load() *Config {
 	}
 	if v := os.Getenv("SERVER_PORT"); v != "" {
 		cfg.Server.Port = v
+	}
+	if v := os.Getenv("MCP_TOKEN"); v != "" {
+		cfg.Server.MCPToken = v
 	}
 
 	return &cfg
